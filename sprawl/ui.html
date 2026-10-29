@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Secrets Sprawl Detector</title>
+<style>
+:root{--bg:#f6f7f9;--panel:#fff;--ink:#14181f;--mute:#5d6674;--line:#e2e5ea;--accent:#2a5bd7;--crit:#b3261e;--high:#c2410c;--med:#a16207;--low:#0e7490;--ok:#157f4b;--chip:#eef1f5}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1218;--panel:#171b23;--ink:#e8ebf0;--mute:#98a1b0;--line:#2a303b;--accent:#7aa2ff;--crit:#ff8a80;--high:#fb923c;--med:#facc15;--low:#22d3ee;--ok:#5fd39a;--chip:#232936}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:14px 24px;background:var(--panel);border-bottom:1px solid var(--line)}header h1{font-size:17px;margin:0;font-weight:650}.badges{margin-left:auto;display:flex;gap:8px}
+.badge{font-size:12px;padding:2px 9px;border:1px solid var(--line);border-radius:999px;color:var(--mute);background:var(--bg)}
+main{display:grid;grid-template-columns:320px 1fr;gap:20px;padding:20px 24px;max-width:1300px;margin:auto}@media(max-width:960px){main{grid-template-columns:1fr;padding:16px}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}.card h2{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);margin:0 0 10px;font-weight:600}
+label{display:block;font-size:12px;color:var(--mute);margin:8px 0 3px}select,input{font:inherit;color:var(--ink);width:100%;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:7px}
+.srcs label{display:flex;gap:6px;align-items:center;color:var(--ink);font-size:13px;margin:4px 0}.srcs input{width:auto}
+button{font:inherit;background:var(--accent);color:#fff;border:0;border-radius:6px;padding:8px 14px;font-weight:600;cursor:pointer;margin-top:12px;width:100%}button:disabled{opacity:.5;cursor:wait}
+.hist{list-style:none;margin:0;padding:0}.hist li{display:flex;gap:8px;align-items:center;padding:7px 6px;border-bottom:1px solid var(--line);cursor:pointer;border-radius:6px}.hist li:hover,.hist li.sel{background:var(--bg)}
+.banner{display:flex;gap:20px;align-items:center;flex-wrap:wrap;padding:16px 18px;border-radius:10px;margin-bottom:16px;border:1px solid var(--line);background:var(--panel)}.big{font-size:24px;font-weight:750}.p-critical .big{color:var(--crit)}.p-attention .big{color:var(--med)}.p-clean .big{color:var(--ok)}
+.m{color:var(--mute);font-size:13px}.tiles{display:flex;gap:10px;margin-left:auto}.tile{text-align:center;padding:6px 14px;border-radius:8px;background:var(--bg);border:1px solid var(--line)}.tile b{display:block;font-size:20px}.tile span{font-size:11px;color:var(--mute);text-transform:uppercase}
+.f{border:1px solid var(--line);border-left:5px solid var(--low);border-radius:8px;padding:10px 14px;margin:10px 0;background:var(--panel)}.f.critical{border-left-color:var(--crit)}.f.high{border-left-color:var(--high)}.f.medium{border-left-color:var(--med)}
+.h{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.sev{font-size:11px;font-weight:700;text-transform:uppercase}.sev.critical{color:var(--crit)}.sev.high{color:var(--high)}.sev.medium{color:var(--med)}.sev.low{color:var(--low)}
+.chip{font-size:11px;padding:1px 7px;border-radius:4px;background:var(--chip);color:var(--mute)}.chip.pub{background:color-mix(in srgb,var(--crit) 16%,transparent);color:var(--crit);font-weight:600}.chip.broad{background:color-mix(in srgb,var(--high) 16%,transparent);color:var(--high)}
+.mask{font:13px ui-monospace,Menlo,monospace;font-weight:600}.res{font:12px ui-monospace,Menlo,monospace;color:var(--mute);word-break:break-all}
+.cmd{font:11px ui-monospace,Menlo,monospace;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:5px 8px;margin:4px 0;word-break:break-all}
+.err{color:var(--crit);font-size:13px;margin-top:8px}.warn{background:color-mix(in srgb,var(--med) 16%,transparent);color:var(--med);padding:8px 12px;border-radius:8px;margin-bottom:10px;font-size:13px}
+table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:5px 6px;text-align:left;border-bottom:1px solid var(--line)}th{font-size:11px;text-transform:uppercase;color:var(--mute)}
+</style>
+</head>
+<body>
+<header><h1>Secrets Sprawl Detector</h1><span class="badge">values are masked everywhere · ranked by who can read them and what they unlock</span><div class="badges" id="badges"></div></header>
+<main>
+<aside>
+ <div class="card"><h2>Scan</h2>
+  <label>Project</label><select id="proj"></select>
+  <label>Sources</label><div class="srcs" id="srcs"></div>
+  <label>Log window (hours)</label><input id="hours" type="number" min="1" max="72" value="24">
+  <label>Model commentary</label><select id="llm"></select>
+  <button id="go">Scan</button><div class="err" id="err"></div></div>
+ <div class="card"><h2>Recent scans</h2><ul class="hist" id="hist"></ul></div>
+</aside>
+<section id="out"><div class="card m" style="padding:40px;text-align:center">Choose sources and run a scan. Findings show masked previews only.</div></section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let cfg={},cur=null;
+async function api(p,o){const r=await fetch(p,o);const b=await r.json().catch(()=>({}));if(!r.ok)throw new Error(b.detail||r.statusText);return b}
+async function init(){cfg=await api("/api/config");$("badges").innerHTML=`<span class="badge">model: ${esc(cfg.provider)}</span><span class="badge">spend $${cfg.spend_today_usd.toFixed(4)}/$${cfg.daily_budget_usd.toFixed(2)}</span>`;
+ $("proj").innerHTML=cfg.projects.map(p=>`<option>${esc(p)}</option>`).join("");$("llm").innerHTML=cfg.allowed_providers.map(p=>`<option ${p===cfg.provider?"selected":""}>${esc(p)}</option>`).join("");
+ $("srcs").innerHTML=cfg.sources.filter(s=>s!=="bucket_object"||cfg.buckets.length).map(s=>`<label><input type="checkbox" value="${esc(s)}" checked> ${esc(s.replace("_"," "))}${s==="bucket_object"?" ("+cfg.buckets.map(esc).join(", ")+")":""}</label>`).join("");
+ $("go").onclick=go;await hist();const h=location.hash.slice(1);if(h)show(await api("/api/scans/"+h))}
+async function hist(){const rows=await api("/api/scans?limit=15");$("hist").innerHTML=rows.map(r=>`<li data-id="${esc(r.id)}" class="${cur===r.id?"sel":""}"><b>${esc(r.posture)}</b><span class="m">${r.findings.length} findings</span></li>`).join("")||`<li class="m" style="cursor:default">none yet</li>`;
+ document.querySelectorAll("#hist li[data-id]").forEach(li=>li.onclick=async()=>show(await api("/api/scans/"+li.dataset.id)))}
+async function go(){$("err").textContent="";$("go").disabled=true;$("go").textContent="Scanning…";
+ const sources=[...document.querySelectorAll("#srcs input:checked")].map(i=>i.value);
+ try{show(await api("/api/scans",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({project:$("proj").value,sources,hours:+$("hours").value,llm:$("llm").value})}));await hist()}
+ catch(e){$("err").textContent=e.message}finally{$("go").disabled=false;$("go").textContent="Scan"}}
+function show(r){cur=r.id;location.hash=r.id;
+ const card=f=>`<div class="f ${f.severity}"><div class="h"><span class="sev ${f.severity}">${f.severity}</span><span class="mask">${esc(f.preview)}</span><span class="chip">${esc(f.secret_type.replaceAll("_"," "))}</span><span class="chip">${esc(f.kind.replace("_"," "))}</span><span class="chip ${f.exposure.level==="public"?"pub":f.exposure.level==="broad"?"broad":""}">exposure: ${esc(f.exposure.level)}${f.exposure.reader_count>0?" ("+f.exposure.reader_count+" readers)":""}</span>${f.key?`<span class="chip">key ${esc(f.key.state.replaceAll("_"," "))}</span>`:""}</div>
+  <div class="res">${esc(f.resource)} ${esc(f.location)}</div><div class="m">${esc(f.why)}</div>${f.note?`<div style="margin-top:4px"><b>note:</b> ${esc(f.note)}</div>`:""}${f.remediation.map(c=>`<div class="cmd">${esc(c)}</div>`).join("")}</div>`;
+ $("out").innerHTML=`<div class="banner p-${r.posture}"><div><div class="big">${esc(r.posture.toUpperCase())}</div><div class="m">${esc(r.project)} · ${(r.duration_ms/1000).toFixed(1)}s · ${esc(r.provider)}</div></div><div class="tiles">${["critical","high","medium","low"].map(k=>`<div class="tile"><b>${r.counts[k]||0}</b><span>${k}</span></div>`).join("")}</div></div>
+ <div class="card"><h2>Summary</h2>${esc(r.summary)}</div>${r.degraded.map(d=>`<div class="warn">⚠ ${esc(d)}</div>`).join("")}
+ <div class="card"><h2>Coverage</h2><table><thead><tr><th>source</th><th>scanned</th><th>skipped</th><th></th></tr></thead><tbody>${r.sources.map(s=>`<tr><td>${esc(s.kind.replace("_"," "))}</td><td>${s.scanned}</td><td>${s.skipped}</td><td class="m">${esc(s.note)}</td></tr>`).join("")}</tbody></table></div>
+ <div class="card"><h2>Findings (${r.findings.length})</h2>${r.findings.map(card).join("")||"<div class='m'>No credentials found.</div>"}${r.dropped.length?`<h2 style="margin-top:14px">Rejected model output</h2>`+r.dropped.map(d=>`<div class="m">✗ ${esc(d.item)} — ${esc(d.reason)}</div>`).join(""):""}</div>`;
+ document.querySelectorAll("#hist li").forEach(li=>li.classList.toggle("sel",li.dataset.id===r.id))}
+init().catch(e=>{$("err").textContent=e.message});
+</script>
+</body>
+</html>
