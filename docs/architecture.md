@@ -1,5 +1,7 @@
 # Architecture
 
+[![Architecture diagram](img/architecture.png)](img/architecture.svg)
+
 ```
 GCP sources (read-only, bounded)               local directory (CLI)
   Cloud Run env vars  | bucket objects | logs | VM metadata        files

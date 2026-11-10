@@ -21,6 +21,12 @@ database URLs with passwords, URLs with credentials, and generic high-entropy se
 For a leaked service-account key it asks IAM (with the scanner's own identity, never the leaked key) whether the key is still active and what roles the account holds:
 an active key on an Editor/Owner account is critical; a key that no longer exists is low.
 
+## Architecture
+
+[![Architecture: private Cloud Run service, engine, read-only sources, optional Gemini, up.sh delivery](docs/img/architecture.png)](docs/img/architecture.svg)
+
+Regenerate with `python3 docs/diagrams/architecture.py` then `python3 docs/diagrams/render.py docs/img/architecture.svg docs/img/architecture.png` (needs Playwright).
+
 ## Quick start
 
 ```bash
